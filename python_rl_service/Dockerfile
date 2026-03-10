@@ -18,6 +18,6 @@ RUN pip install --upgrade pip && \
 COPY . ./
 
 # Expose port (defaulting to 5000 based on standard Flask/Gunicorn or 8001 if customized, assuming 5000 for standard run)
-EXPOSE 5000
+EXPOSE 4010
 
-CMD ["flask", "run", "--host=0.0.0.0", "--port=5000"]
+CMD ["flask", "run", "--host=0.0.0.0", "--port=4010"]
