@@ -20,7 +20,7 @@ RUN pip install --upgrade pip \
 COPY app.py ./app.py
 COPY dqn_agent.py ./dqn_agent.py
 COPY temp_user_detector ./temp_user_detector
-COPY artifacts ./artifacts
+RUN mkdir -p ./artifacts
 
 EXPOSE 4010
 
