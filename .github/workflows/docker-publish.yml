@@ -12,6 +12,7 @@ on:
       - '.github/workflows/docker-publish.yml'
   pull_request:
     branches: [ "deploy" ]
+  workflow_dispatch:
 
 jobs:
   build-and-push-node:
@@ -63,3 +64,86 @@ jobs:
         tags: ${{ secrets.DOCKER_USERNAME }}/optimization-python-rl:latest
         cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/optimization-python-rl:buildcache
         cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/optimization-python-rl:buildcache,mode=max
+
+  deploy-to-vps:
+    if: ${{ github.event_name != 'pull_request' }}
+    needs:
+      - build-and-push-node
+      - build-and-push-python
+    runs-on: ubuntu-latest
+    steps:
+    - name: Deploy Optimization services to VPS
+      uses: appleboy/ssh-action@v1.2.0
+      with:
+        host: ${{ secrets.VPS_HOST }}
+        username: ${{ secrets.VPS_USERNAME }}
+        key: ${{ secrets.VPS_SSH_KEY }}
+        passphrase: ${{ secrets.VPS_SSH_PASSPHRASE }}
+        port: ${{ secrets.VPS_PORT || '22' }}
+        script_stop: true
+        script: |
+          set -eu
+
+          LOCK_DIR=/tmp/aura-deploy.lock
+          while ! mkdir "$LOCK_DIR" 2>/dev/null; do
+            sleep 2
+          done
+          trap 'rmdir "$LOCK_DIR"' EXIT
+
+          check_url() {
+            url="$1"
+            attempt=1
+            while [ "$attempt" -le 12 ]; do
+              if command -v curl > /dev/null 2>&1; then
+                if curl -fsS "$url" > /dev/null; then
+                  return 0
+                fi
+              elif wget -q -O /dev/null "$url"; then
+                return 0
+              fi
+              attempt=$((attempt + 1))
+              sleep 5
+            done
+            return 1
+          }
+
+          resolve_compose() {
+            if docker info > /dev/null 2>&1; then
+              if command -v docker-compose > /dev/null 2>&1; then
+                COMPOSE_BIN="docker-compose"
+                return 0
+              fi
+              if docker compose version > /dev/null 2>&1; then
+                COMPOSE_BIN="docker compose"
+                return 0
+              fi
+            fi
+
+            if sudo -n docker info > /dev/null 2>&1; then
+              if command -v docker-compose > /dev/null 2>&1 && sudo -n docker-compose version > /dev/null 2>&1; then
+                COMPOSE_BIN="sudo -n docker-compose"
+                return 0
+              fi
+              if sudo -n docker compose version > /dev/null 2>&1; then
+                COMPOSE_BIN="sudo -n docker compose"
+                return 0
+              fi
+            fi
+
+            echo "Docker daemon is not accessible for this SSH user. Add the user to the docker group or allow passwordless sudo for docker/docker-compose."
+            exit 1
+          }
+
+          cd "${{ secrets.VPS_DEPLOY_PATH }}"
+          export DOCKER_USERNAME="${{ secrets.DOCKER_USERNAME }}"
+          resolve_compose
+
+          sh -c "$COMPOSE_BIN pull opt-node-backend opt-rl-backend"
+          sh -c "$COMPOSE_BIN up -d --force-recreate --no-deps opt-node-backend opt-rl-backend"
+
+          check_url "http://127.0.0.1:4000/api/health" &&
+          check_url "http://127.0.0.1:4010/rl/health" || {
+            sh -c "$COMPOSE_BIN ps opt-node-backend opt-rl-backend"
+            sh -c "$COMPOSE_BIN logs --tail 50 opt-node-backend opt-rl-backend"
+            exit 1
+          }
