@@ -25,3 +25,4 @@ COPY artifacts ./artifacts
 EXPOSE 4010
 
 CMD ["python", "app.py"]
+
