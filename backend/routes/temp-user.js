@@ -5,7 +5,7 @@ const router = express.Router();
 const MLPE_API_URL = process.env.MLPE_API_URL || process.env.MLPE_BACKEND_URL || 'https://aura-ml-backend-production-bdd3.up.railway.app';
 const TEMPLATE_CACHE_TTL_MS = Number(process.env.TEMP_TEMPLATE_CACHE_TTL_MS || 60000);
 const MIN_TEMPLATE_SAMPLES = Number(process.env.TEMP_TEMPLATE_MIN_SAMPLES || 5);
-const QUARANTINE_DEVIATION = Number(process.env.TEMP_USER_QUARANTINE_DEVIATION || 0.45);
+const QUARANTINE_DEVIATION = Number(process.env.TEMP_USER_QUARANTINE_DEVIATION || 0.43);
 const REJECT_DEVIATION = Number(process.env.TEMP_USER_REJECT_DEVIATION || 0.60);
 
 const templateCache = new Map(); // userId -> { expiresAt: number, template: object | null }
