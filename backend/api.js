@@ -118,6 +118,17 @@ app.post('/api/users/:userId/settings', async (req, res) => {
   try {
     const { userId } = req.params;
     const { settings, source = 'user_manual' } = req.body;
+
+    if (source === 'extension') {
+      const user = await dbService.getUser(userId);
+      console.log(`[Settings] Ignored extension hydration write for ${userId}`);
+      return res.json({
+        success: true,
+        data: user.currentSettings,
+        ignored: true,
+        reason: 'extension_hydration_is_not_authoritative'
+      });
+    }
     
     const updatedSettings = await dbService.updateUserSettings(userId, settings, source);
     
@@ -174,6 +185,17 @@ app.post('/api/settings/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
     const { settings, source = 'dashboard' } = req.body;
+
+    if (source === 'extension') {
+      const user = await dbService.getUser(userId);
+      console.log(`[Settings] Ignored extension hydration write for ${userId}`);
+      return res.json({
+        success: true,
+        data: user.currentSettings,
+        ignored: true,
+        reason: 'extension_hydration_is_not_authoritative'
+      });
+    }
 
     const updatedSettings = await dbService.updateUserSettings(userId, settings, source);
 
