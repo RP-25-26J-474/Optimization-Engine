@@ -698,9 +698,17 @@ app.post('/api/users/:userId/feedback', async (req, res) => {
     
     console.log(' RL Suggested:', nextSuggestion?.suggestedValue);
     
-    // Auto-apply RL suggestion to user settings
+    // Auto-apply RL suggestion to user settings only when the suggestion is
+    // explicitly marked safe to apply. Positive manual feedback is a learning
+    // signal, not permission to immediately overwrite the user's choice.
     let updatedSettings = null;
-    if (nextSuggestion && nextSuggestion.suggestedValue) {
+    const shouldApplySuggestion = Boolean(
+      nextSuggestion &&
+      nextSuggestion.suggestedValue !== undefined &&
+      nextSuggestion.shouldApply
+    );
+
+    if (shouldApplySuggestion) {
       // Update both current settings and RL suggested settings
       updatedSettings = await dbService.updateUserSettings(
         userId,
@@ -717,6 +725,15 @@ app.post('/api/users/:userId/feedback', async (req, res) => {
       });
       
       console.log(` Auto-applied RL suggestion: ${parameter} = ${nextSuggestion.suggestedValue}`);
+    } else {
+      updatedSettings = {
+        ...user.currentSettings,
+        [parameter]: currentValue
+      };
+      console.log(` RL suggestion not auto-applied for ${parameter}:`, {
+        suggestedValue: nextSuggestion?.suggestedValue,
+        shouldApply: nextSuggestion?.shouldApply
+      });
     }
     
     // Log event
@@ -725,7 +742,7 @@ app.post('/api/users/:userId/feedback', async (req, res) => {
       oldValue: currentValue,
       newValue: nextSuggestion?.suggestedValue,
       feedbackType: feedback.type,
-      autoApplied: true
+      autoApplied: shouldApplySuggestion
     });
     
     res.json({
